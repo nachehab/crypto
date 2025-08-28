@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euxo pipefail
 SESSION="jesse"
 CMD="bash -lc '/home/nader/bin/run_jesse'"
 if tmux has-session -t "$SESSION" 2>/dev/null; then
