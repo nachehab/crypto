@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
-set -euxo pipefail
+set -euo pipefail
+
 SESSION="freqtrade_web"
-CMD="bash -lc '$HOME/bin/run_freqtrade_web 2>&1 | tee -a $HOME/trading-bots/logs/freqtrade_web.log; read -n1 -r -p \"[freqtrade webserver exited] Press any key...\"'"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CMD="bash -lc '$SCRIPT_DIR/run_freqtrade_web 2>&1 | tee -a $HOME/trading-bots/logs/freqtrade_web.log; read -n1 -r -p \"[freqtrade webserver exited] Press any key...\"'"
 mkdir -p "$HOME/trading-bots/logs"
-tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" "$CMD"
-tmux ls | grep -E "^$SESSION:"
+
+if command -v tmux >/dev/null; then
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "tmux session '$SESSION' already exists."
+  else
+    tmux new-session -d -s "$SESSION" "$CMD"
+    echo "Started tmux session '$SESSION'."
+  fi
+  tmux ls | grep -E "^$SESSION:" || true
+else
+  echo "tmux not found; running $CMD directly."
+  eval "$CMD"
+fi
