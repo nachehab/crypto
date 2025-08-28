@@ -1,0 +1,3 @@
+DATA_STORAGE_PATH = "storage"
+DEBUG_MODE = True
+

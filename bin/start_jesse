@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SESSION="jesse"
-CMD="bash -lc '/home/nader/bin/run_jesse'"
+CMD="bash -lc '$HOME/bin/run_jesse'"
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   echo "tmux session '$SESSION' already exists."
 else
