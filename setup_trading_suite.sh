@@ -15,6 +15,7 @@ PY_HB="3.10.17"
 PY_JE="3.10.17"
 PY_OB="3.10.17"
 PY_CO="3.12.10"
+PY_DB="3.12.10"
 
 # Virtualenv names
 VENV_FT="freqtrade-env"
@@ -22,6 +23,7 @@ VENV_HB="hummingbot-env"
 VENV_JE="jesse-env"
 VENV_OB="octobot-env"
 VENV_CO="collector-env"
+VENV_DB="dashboard-env"
 
 ### ─────────────────────────────────────────────────────────────────────────────
 ### Helpers
@@ -146,6 +148,7 @@ pyenv install -s "${PY_HB}"
 pyenv install -s "${PY_JE}"
 pyenv install -s "${PY_OB}"
 pyenv install -s "${PY_CO}"
+pyenv install -s "${PY_DB}"
 
 ### ─────────────────────────────────────────────────────────────────────────────
 ### 3) Create virtualenvs
@@ -156,6 +159,7 @@ pyenv virtualenv -f "${PY_HB}" "${VENV_HB}" || true
 pyenv virtualenv -f "${PY_JE}" "${VENV_JE}" || true
 pyenv virtualenv -f "${PY_OB}" "${VENV_OB}" || true
 pyenv virtualenv -f "${PY_CO}" "${VENV_CO}" || true
+pyenv virtualenv -f "${PY_DB}" "${VENV_DB}" || true
 
 ### ─────────────────────────────────────────────────────────────────────────────
 ### 4) Freqtrade (≥3.11)
@@ -254,7 +258,39 @@ EOS
 mk_tmux_runner "hummingbot" "${BINDIR}/run_hummingbot"
 
 ### ─────────────────────────────────────────────────────────────────────────────
-### 6) Jesse
+### 6) Hummingbot Dashboard
+### ─────────────────────────────────────────────────────────────────────────────
+log "Installing Hummingbot Dashboard into ${VENV_DB}"
+pyenv_shell "pyenv activate ${VENV_DB} && \
+  python -m pip install --upgrade pip && \
+  pip install sqlalchemy hummingbot hummingbot-api-client nest_asyncio pydantic \
+    'streamlit>=1.36.0' watchdog python-dotenv 'plotly==5.24.1' pycoingecko glom defillama \
+    statsmodels 'pandas_ta==0.3.14b' pyyaml pathlib streamlit-authenticator==0.3.2 \
+    flake8 isort pre-commit"
+
+DB_DIR="${WORKDIR}/dashboard"
+if [[ ! -d "${DB_DIR}" ]]; then
+  git clone https://github.com/hummingbot/dashboard.git "${DB_DIR}"
+fi
+
+mk_runner "run_dashboard" "$(cat <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+pyenv activate dashboard-env
+DB_DIR="${HOME}/trading-bots/dashboard"
+cd "$DB_DIR"
+exec streamlit run main.py --server.headless true
+EOS
+)"
+
+mk_tmux_runner "dashboard" "${BINDIR}/run_dashboard"
+
+### ─────────────────────────────────────────────────────────────────────────────
+### 7) Jesse
 ### ─────────────────────────────────────────────────────────────────────────────
 log "Installing Jesse into ${VENV_JE}"
 pyenv_shell "pyenv activate ${VENV_JE} && \
@@ -291,7 +327,7 @@ EOS
 mk_tmux_runner "jesse" "${BINDIR}/run_jesse"
 
 ### ─────────────────────────────────────────────────────────────────────────────
-### 7) OctoBot
+### 8) OctoBot
 ### ─────────────────────────────────────────────────────────────────────────────
 log "Installing OctoBot into ${VENV_OB}"
 pyenv_shell "pyenv activate ${VENV_OB} && \
@@ -332,7 +368,7 @@ EOS
 mk_tmux_runner "octobot" "${BINDIR}/run_octobot"
 
 ### ─────────────────────────────────────────────────────────────────────────────
-### 8) Collector
+### 9) Collector
 ### ─────────────────────────────────────────────────────────────────────────────
 log "Setting up Collector into ${VENV_CO}"
 pyenv_shell "pyenv activate ${VENV_CO} && \
@@ -381,7 +417,7 @@ EOS
 mk_tmux_runner "collector" "${BINDIR}/run_collector"
 
 ### ─────────────────────────────────────────────────────────────────────────────
-### 9) Final notes
+### 10) Final notes
 ### ─────────────────────────────────────────────────────────────────────────────
 log "All set! Runners and tmux starters created."
 cat <<'INFO'
@@ -389,6 +425,7 @@ cat <<'INFO'
 Usage examples:
   start_freqtrade
   start_hummingbot
+  start_dashboard
   start_jesse
   start_octobot
   start_collector
