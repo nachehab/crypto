@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SESSION="freqtrade_web"
+CMD="bash -lc '$HOME/bin/run_freqtrade_web 2>&1 | tee -a $HOME/trading-bots/logs/freqtrade_web.log; read -n1 -r -p \"[freqtrade webserver exited] Press any key...\"'"
+mkdir -p "$HOME/trading-bots/logs"
+tmux has-session -t "$SESSION" 2>/dev/null || tmux new-session -d -s "$SESSION" "$CMD"
+tmux ls | grep -E "^$SESSION:"

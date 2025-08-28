@@ -1,0 +1,10 @@
+usage: freqtrade [-h] [-V]
+                 {trade,create-userdir,new-config,show-config,new-strategy,download-data,convert-data,convert-trade-data,trades-to-ohlcv,list-data,backtesting,backtesting-show,backtesting-analysis,edge,hyperopt,hyperopt-list,hyperopt-show,list-exchanges,list-markets,list-pairs,list-strategies,list-hyperoptloss,list-freqaimodels,list-timeframes,show-trades,test-pairlist,convert-db,install-ui,plot-dataframe,plot-profit,webserver,strategy-updater,lookahead-analysis,recursive-analysis}
+                 ...
+freqtrade: error: unrecognized arguments: --host 0.0.0.0 --port 8080
+2025-08-28 17:07:59,205 - freqtrade - INFO - freqtrade 2025.8-dev-cd2f410
+2025-08-28 17:08:01,577 - freqtrade.configuration.load_config - INFO - Using config: /home/nader/trading-bots/freqtrade/config/config.json ...
+2025-08-28 17:08:01,585 - freqtrade.loggers - INFO - Enabling colorized output.
+2025-08-28 17:08:01,585 - freqtrade.loggers - INFO - Logfile configured
+2025-08-28 17:08:01,586 - freqtrade.loggers - INFO - Verbosity set to 0
+2025-08-28 17:08:01,587 - freqtrade - ERROR - Directory `/home/nader/123/user_data` does not exist. Please use `freqtrade create-userdir` to create a user directory

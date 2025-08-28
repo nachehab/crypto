@@ -1,0 +1,17 @@
+strategy: pure_market_making
+market: paper_trade
+market_trading_pair_tuple:
+  - ${PAIR}
+order_amount: 0.001
+order_levels: 1
+order_level_spread: 0.003
+order_refresh_time: 60.0
+order_refresh_tolerance_pct: 0.0
+filled_order_delay: 1.0
+inventory_skew_enabled: false
+status_reporting: true
+logging_level: INFO
+# Exports
+reporting:
+  trade_reporting: true
+  # Hummingbot writes trades to /data by default; we also rely on logs

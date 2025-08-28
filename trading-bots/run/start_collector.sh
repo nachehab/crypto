@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SESSION="collector"
+CMD="bash -lc '/home/nader/bin/run_collector'"
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+  echo "tmux session '$SESSION' already exists."
+else
+  tmux new-session -d -s "$SESSION" "$CMD"
+  echo "Started tmux session '$SESSION'."
+fi
+tmux ls | grep -E "^$SESSION:"
