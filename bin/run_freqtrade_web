@@ -5,5 +5,8 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 pyenv activate freqtrade-env
-exec freqtrade webserver -c /home/nader/trading-bots/freqtrade/config/config.json
+
+FT_DIR="$HOME/trading-bots/freqtrade"
+CFG="$FT_DIR/config/freqtrade/config.json"
+exec freqtrade webserver -c "$CFG"
 

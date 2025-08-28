@@ -35,7 +35,7 @@
     "username": "user",
     "password": "pass"
   },
-  "datadir": "/home/nader/user_data/data",
-  "user_data_dir": "/home/nader/user_data",
-  "strategy_path": "/home/nader/user_data/strategies"
-}
+    "datadir": "user_data/data",
+    "user_data_dir": "user_data",
+    "strategy_path": "user_data/strategies"
+  }
