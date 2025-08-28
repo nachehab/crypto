@@ -30,6 +30,13 @@ log() { printf "\n\033[1;32m[✔]\033[0m %s\n" "$*"; }
 warn() { printf "\n\033[1;33m[!]\033[0m %s\n" "$*"; }
 note() { printf "    • %s\n" "$*"; }
 
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf "\n\033[1;31m[✘]\033[0m Missing required command '%s'.\n" "$1" >&2
+    exit 1
+  fi
+}
+
 ensure_line() {
   local line file
   line="$1"; file="$2"
@@ -42,6 +49,12 @@ activate_pyenv_in_shells() {
   ensure_line 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' "${HOME}/.bashrc"
   ensure_line 'eval "$(pyenv init -)"' "${HOME}/.bashrc"
   ensure_line 'eval "$(pyenv virtualenv-init -)"' "${HOME}/.bashrc"
+
+  # profile (login shells)
+  ensure_line 'export PYENV_ROOT="$HOME/.pyenv"' "${HOME}/.profile"
+  ensure_line 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' "${HOME}/.profile"
+  ensure_line 'eval "$(pyenv init -)"' "${HOME}/.profile"
+  ensure_line 'eval "$(pyenv virtualenv-init -)"' "${HOME}/.profile"
 
   # zsh, if present
   if [[ -f "${HOME}/.zshrc" ]]; then
@@ -102,6 +115,10 @@ sudo apt-get install -y \
   libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
   libffi-dev liblzma-dev tk-dev uuid-runtime \
   pkg-config
+
+for cmd in curl git tmux screen gcc; do
+  require_cmd "$cmd"
+done
 
 mkdir -p "${WORKDIR}" "${BINDIR}"
 
