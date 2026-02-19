@@ -1,0 +1,27 @@
+{
+  "providers": {
+    "custom-192-168-86-128-11434": {
+      "baseUrl": "http://192.168.86.128:11434/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "qwen2.5:7b-instruct",
+          "name": "qwen2.5:7b-instruct",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 16000,
+          "maxTokens": 512
+        }
+      ],
+      "apiKey": "local"
+    }
+  }
+}

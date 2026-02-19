@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "socket": {
+    "path": "/home/nader/.openclaw/exec-approvals.sock",
+    "token": "pvfBEQ1cDfOxaqH4rjFgZo51wpCbHGbi"
+  },
+  "defaults": {},
+  "agents": {}
+}
