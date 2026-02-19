@@ -6,6 +6,10 @@
   "env": {
     "shellEnv": {
       "enabled": true
+    },
+    "vars": {
+      "COINBASE_API_SECRET": "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIJANcQH7cTR6BOO186L9uA876boPVjE3Q0RS1rjDRID3oAoGCCqGSM49\\nAwEHoUQDQgAE8s2t7Zd4epwUm59+NIsPrNss/AuofnL8uzy5eJlG6JXThCZTIlDY\\ngDaYpUtbwCT0LfA9W3/K/f7X1WcB4gTqZQ==\\n-----END EC PRIVATE KEY-----\\n",
+      "COINBASE_API_KEY": "organizations/4456adcb-0fc5-4f8e-81ea-314032fe55ed/apiKeys/fd487e30-9667-40d4-8236-461751dac9a2"
     }
   },
   "wizard": {
@@ -125,19 +129,7 @@
     "entries": {
       "base-trader": {
         "enabled": false
-      },
-      "coinbase-advanced-trader": {
-        "enabled": true,
-        "env": {
-          "COINBASE_API_KEY": "organizations/4456adcb-0fc5-4f8e-81ea-314032fe55ed/apiKeys/fd487e30-9667-40d4-8236-461751dac9a2",
-          "COINBASE_API_SECRET": "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIJANcQH7cTR6BOO186L9uA876boPVjE3Q0RS1rjDRID3oAoGCCqGSM49\\nAwEHoUQDQgAE8s2t7Zd4epwUm59+NIsPrNss/AuofnL8uzy5eJlG6JXThCZTIlDY\\ngDaYpUtbwCT0LfA9W3/K/f7X1WcB4gTqZQ==\\n-----END EC PRIVATE KEY-----\\n"
-        }
       }
-    },
-    "load": {
-      "extraDirs": [
-        "/workspace/crypto/skills"
-      ]
     }
   }
 }
