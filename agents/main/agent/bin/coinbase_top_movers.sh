@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-repo_root="$(cd "$(dirname "$0")/../../../.." && pwd)"
-exec "$repo_root/skills/coinbase-market-analyzer/bin/coinbase_top_movers.sh" "$@"
