@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-script_dir="$(cd "$(dirname "$0")" && pwd)"
-source "$script_dir/openclaw_env.sh"
-python3 "$script_dir/../../../../scripts/coinbase_cli.py" multi_timeframe_summary "$@"
+repo_root="$(cd "$(dirname "$0")/../../../.." && pwd)"
+exec "$repo_root/skills/coinbase-market-analyzer/bin/coinbase_multi_timeframe_summary.sh" "$@"
