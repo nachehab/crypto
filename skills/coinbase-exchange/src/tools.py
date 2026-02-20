@@ -11,7 +11,7 @@ from markets import list_markets as list_markets_impl
 from schema import result
 
 
-REQUIRED_ENV = ["COINBASE_API_KEY", "COINBASE_API_SECRET", "COINBASE_PASSPHRASE"]
+REQUIRED_ENV = ["COINBASE_API_KEY", "COINBASE_API_SECRET"]
 
 
 def _client() -> CoinbaseExchangeClient:
@@ -42,7 +42,7 @@ def coinbase_doctor() -> Dict[str, Any]:
             checks.append({"name": "auth_check", "ok": True})
         except CoinbaseExchangeError as exc:
             checks.append({"name": "auth_check", "ok": False, "detail": str(exc)})
-            hints.append("Verify API key, secret, passphrase, and permissions for Coinbase Exchange REST")
+            hints.append("Verify API key, secret, and permissions for Coinbase Advanced Trade REST")
     else:
         checks.append({"name": "auth_check", "ok": False, "detail": "Skipped because credentials missing"})
 

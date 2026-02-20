@@ -9,7 +9,6 @@
         "env": {
           "COINBASE_API_KEY": "${COINBASE_API_KEY}",
           "COINBASE_API_SECRET": "${COINBASE_API_SECRET}",
-          "COINBASE_PASSPHRASE": "${COINBASE_PASSPHRASE}",
           "COINBASE_API_URL": "${COINBASE_API_URL}"
         },
         "apiKey": "${COINBASE_API_KEY}"
