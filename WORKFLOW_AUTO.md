@@ -80,3 +80,17 @@
 
 **Risk control**:
 - Default max exposure 5% unless explicit user override.
+
+## Coinbase Market Analysis Tool Calls
+
+- `coinbase_doctor` -> run `agents/main/agent/bin/coinbase_doctor.sh`
+- `analyze_markets({quote, window, limit})` -> run `agents/main/agent/bin/coinbase_analyze_markets.sh --quote <quote> --window <window> --limit <limit>`
+- Additional direct tools:
+  - `list_markets`
+  - `top_movers`
+  - `volatility_rank`
+  - `liquidity_snapshot`
+  - `trend_signal`
+  - `multi_timeframe_summary`
+
+All functions must return JSON with `summary` and `data`.
