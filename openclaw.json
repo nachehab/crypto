@@ -129,6 +129,15 @@
     "entries": {
       "base-trader": {
         "enabled": false
+      },
+      "coinbase-market-analyzer": {
+        "enabled": true,
+        "env": {
+          "COINBASE_API_KEY": "${COINBASE_API_KEY}",
+          "COINBASE_API_SECRET": "${COINBASE_API_SECRET}",
+          "COINBASE_PASSPHRASE": "${COINBASE_PASSPHRASE}"
+        },
+        "apiKey": "${COINBASE_API_KEY}"
       }
     }
   }

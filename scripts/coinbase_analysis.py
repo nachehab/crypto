@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import math
 import os
+import random
 import statistics
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib import error, parse, request
 
 EXCHANGE_API = "https://api.exchange.coinbase.com"
 CACHE_TTL_SECONDS = 300
+_TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504}
 
 
 def _cache_path() -> Path:
@@ -25,9 +30,10 @@ class CoinbaseAPIError(RuntimeError):
 
 
 class CoinbaseConnector:
-    def __init__(self, timeout: int = 10, throttle_seconds: float = 0.08):
+    def __init__(self, timeout: int = 10, throttle_seconds: float = 0.08, max_retries: int = 3):
         self.timeout = timeout
         self.throttle_seconds = throttle_seconds
+        self.max_retries = max_retries
         self._last_call = 0.0
 
     def _sleep_for_throttle(self) -> None:
@@ -35,22 +41,75 @@ class CoinbaseConnector:
         if gap < self.throttle_seconds:
             time.sleep(self.throttle_seconds - gap)
 
-    def _get_json(self, path: str, query: Optional[Dict[str, Any]] = None) -> Any:
-        self._sleep_for_throttle()
-        url = f"{EXCHANGE_API}{path}"
-        if query:
-            url = f"{url}?{parse.urlencode(query)}"
-        req = request.Request(url, headers={"Accept": "application/json", "User-Agent": "openclaw-coinbase-cli/1.0"})
+    def _auth_headers(self, method: str, path: str, body: str = "") -> Dict[str, str]:
+        key = os.environ.get("COINBASE_API_KEY")
+        secret = os.environ.get("COINBASE_API_SECRET")
+        passphrase = os.environ.get("COINBASE_PASSPHRASE")
+        if not (key and secret and passphrase):
+            return {}
+        timestamp = str(time.time())
+        prehash = f"{timestamp}{method.upper()}{path}{body}"
         try:
-            with request.urlopen(req, timeout=self.timeout) as resp:
-                self._last_call = time.time()
-                body = resp.read().decode("utf-8")
-                return json.loads(body)
-        except error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="ignore")
-            raise CoinbaseAPIError(f"HTTP {exc.code} for {path}: {detail[:250]}") from exc
-        except error.URLError as exc:
-            raise CoinbaseAPIError(f"Network error for {path}: {exc}") from exc
+            signing_key = base64.b64decode(secret)
+        except Exception:
+            return {}
+        signature = base64.b64encode(hmac.new(signing_key, prehash.encode("utf-8"), hashlib.sha256).digest()).decode("utf-8")
+        return {
+            "CB-ACCESS-KEY": key,
+            "CB-ACCESS-SIGN": signature,
+            "CB-ACCESS-TIMESTAMP": timestamp,
+            "CB-ACCESS-PASSPHRASE": passphrase,
+        }
+
+    def _request_json(self, method: str, path: str, query: Optional[Dict[str, Any]] = None, authenticated: bool = False) -> Tuple[Any, Dict[str, str]]:
+        encoded_query = f"?{parse.urlencode(query)}" if query else ""
+        url = f"{EXCHANGE_API}{path}{encoded_query}"
+        body = ""
+        headers = {"Accept": "application/json", "User-Agent": "openclaw-coinbase-cli/1.1"}
+        if authenticated:
+            headers.update(self._auth_headers(method, path + encoded_query, body))
+
+        for attempt in range(self.max_retries + 1):
+            self._sleep_for_throttle()
+            req = request.Request(url, headers=headers, method=method.upper())
+            try:
+                with request.urlopen(req, timeout=self.timeout) as resp:
+                    self._last_call = time.time()
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    return payload, dict(resp.headers.items())
+            except error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="ignore")
+                if exc.code in _TRANSIENT_HTTP and attempt < self.max_retries:
+                    retry_after = float(exc.headers.get("Retry-After", "0") or 0)
+                    backoff = max(retry_after, (2**attempt) * 0.25 + random.uniform(0, 0.25))
+                    time.sleep(backoff)
+                    continue
+                raise CoinbaseAPIError(f"HTTP {exc.code} for {path}: {detail[:250]}") from exc
+            except error.URLError as exc:
+                if attempt < self.max_retries:
+                    time.sleep((2**attempt) * 0.25 + random.uniform(0, 0.25))
+                    continue
+                raise CoinbaseAPIError(f"Network error for {path}: {exc}") from exc
+
+        raise CoinbaseAPIError(f"Request failed after retries: {path}")
+
+    def _get_json(self, path: str, query: Optional[Dict[str, Any]] = None, authenticated: bool = False) -> Any:
+        data, _ = self._request_json("GET", path, query=query, authenticated=authenticated)
+        return data
+
+    def get_paginated(self, path: str, query: Optional[Dict[str, Any]] = None, max_pages: int = 5) -> List[Dict[str, Any]]:
+        merged: List[Dict[str, Any]] = []
+        cursor_query = dict(query or {})
+        for _ in range(max_pages):
+            data, headers = self._request_json("GET", path, query=cursor_query)
+            if not isinstance(data, list):
+                break
+            merged.extend(data)
+            after = headers.get("cb-after")
+            if not after:
+                break
+            cursor_query["after"] = after
+        return merged
 
     def list_products(self) -> List[Dict[str, Any]]:
         return self._get_json("/products")
@@ -169,7 +228,7 @@ def realized_volatility(candles: List[List[float]]) -> float:
     return statistics.pstdev(rets) * math.sqrt(len(rets))
 
 
-def list_markets(connector: CoinbaseConnector, quote_currency: str = "USD") -> Dict[str, Any]:
+def list_markets(connector: CoinbaseConnector, quote_currency: str = "USD", status: Optional[str] = None, limit: int = 200) -> Dict[str, Any]:
     cached = _load_market_cache()
     products = cached if cached is not None else connector.list_products()
     if cached is None:
@@ -179,19 +238,27 @@ def list_markets(connector: CoinbaseConnector, quote_currency: str = "USD") -> D
         quote = item.get("quote_currency")
         if quote_currency and quote != quote_currency:
             continue
-        markets.append({
-            "product_id": item.get("id"),
-            "base": item.get("base_currency"),
-            "quote": quote,
-            "status": item.get("status") or ("online" if not item.get("trading_disabled") else "offline"),
-            "min_size": item.get("base_min_size") or item.get("min_market_funds"),
-        })
+        resolved_status = item.get("status") or ("online" if not item.get("trading_disabled") else "offline")
+        if status and resolved_status != status:
+            continue
+        markets.append(
+            {
+                "product_id": item.get("id"),
+                "base": item.get("base_currency"),
+                "quote": quote,
+                "status": resolved_status,
+                "min_size": item.get("base_min_size") or item.get("min_market_funds"),
+                "quote_increment": item.get("quote_increment"),
+                "base_increment": item.get("base_increment"),
+            }
+        )
     markets.sort(key=lambda m: m["product_id"] or "")
-    summary = f"{len(markets)} {quote_currency} markets available"
-    return {"summary": summary, "data": markets}
+    sliced = markets[: max(1, limit)]
+    summary = f"{len(sliced)} {quote_currency} markets available"
+    return {"summary": summary, "data": sliced}
 
 
-def _market_snapshot(connector: CoinbaseConnector, market: Dict[str, Any], window: str) -> Optional[Dict[str, Any]]:
+def _market_snapshot(connector: CoinbaseConnector, market: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     pid = market["product_id"]
     try:
         ticker = connector.product_ticker(pid)
@@ -214,12 +281,19 @@ def _market_snapshot(connector: CoinbaseConnector, market: Dict[str, Any], windo
     }
 
 
-def top_movers(connector: CoinbaseConnector, time_window: str = "24h", quote_currency: str = "USD", limit: int = 10) -> Dict[str, Any]:
+def top_movers(
+    connector: CoinbaseConnector,
+    time_window: str = "24h",
+    quote_currency: str = "USD",
+    limit: int = 10,
+    min_volume: float = 0.0,
+) -> Dict[str, Any]:
+    _ = time_window
     markets = list_markets(connector, quote_currency)["data"]
     rows = []
     for market in markets[: min(120, len(markets))]:
-        snap = _market_snapshot(connector, market, time_window)
-        if snap and snap["volume"] > 0:
+        snap = _market_snapshot(connector, market)
+        if snap and snap["volume"] >= min_volume:
             rows.append(snap)
     rows.sort(key=lambda r: (r["change_pct"], r["change_abs"]), reverse=True)
     top_gainers = rows[:limit]
@@ -228,7 +302,13 @@ def top_movers(connector: CoinbaseConnector, time_window: str = "24h", quote_cur
     return {"summary": summary, "data": {"gainers": top_gainers, "losers": top_losers}}
 
 
-def volatility_rank(connector: CoinbaseConnector, time_window: str = "24h", quote_currency: str = "USD", limit: int = 10) -> Dict[str, Any]:
+def volatility_rank(
+    connector: CoinbaseConnector,
+    time_window: str = "24h",
+    quote_currency: str = "USD",
+    limit: int = 10,
+    min_candles: int = 10,
+) -> Dict[str, Any]:
     window = WINDOWS.get(time_window, WINDOWS["24h"])
     markets = list_markets(connector, quote_currency)["data"]
     ranks = []
@@ -238,15 +318,11 @@ def volatility_rank(connector: CoinbaseConnector, time_window: str = "24h", quot
             candles = connector.product_candles(pid, granularity=window.granularity, limit=window.bars)
         except CoinbaseAPIError:
             continue
+        if len(candles) < min_candles:
+            continue
         vol = realized_volatility(candles)
         last = _to_float(candles[-1][4], 0.0) if candles else 0.0
-        ranks.append({
-            "product_id": pid,
-            "base": market.get("base"),
-            "quote": market.get("quote"),
-            "price": last,
-            "volatility": vol,
-        })
+        ranks.append({"product_id": pid, "base": market.get("base"), "quote": market.get("quote"), "price": last, "volatility": vol})
     ranks.sort(key=lambda r: r["volatility"], reverse=True)
     summary = f"Volatility ranked for {len(ranks)} {quote_currency} markets"
     return {"summary": summary, "data": ranks[:limit]}
@@ -271,16 +347,18 @@ def liquidity_snapshot(connector: CoinbaseConnector, quote_currency: str = "USD"
         spread = ((best_ask - best_bid) / mid * 100) if mid else 0.0
         bid_depth = sum(_to_float(row[1]) for row in bids[:10])
         ask_depth = sum(_to_float(row[1]) for row in asks[:10])
-        rows.append({
-            "product_id": pid,
-            "base": market.get("base"),
-            "quote": market.get("quote"),
-            "price": mid,
-            "spread": spread,
-            "bid_depth": bid_depth,
-            "ask_depth": ask_depth,
-            "liquidity_score": bid_depth + ask_depth,
-        })
+        rows.append(
+            {
+                "product_id": pid,
+                "base": market.get("base"),
+                "quote": market.get("quote"),
+                "price": mid,
+                "spread": spread,
+                "bid_depth": bid_depth,
+                "ask_depth": ask_depth,
+                "liquidity_score": bid_depth + ask_depth,
+            }
+        )
     rows.sort(key=lambda r: (r["spread"], -r["liquidity_score"]))
     summary = f"Liquidity snapshot for {len(rows)} {quote_currency} markets"
     return {"summary": summary, "data": rows[:limit]}
@@ -313,7 +391,10 @@ def trend_signal(connector: CoinbaseConnector, product_id: str, timeframe: str =
         "volatility": realized_volatility(candles),
         "spread": None,
         "trend_label": label,
-        "notes": [f"ema_slope={ema_slope:.6f}", f"rsi={rsi_v:.2f}", f"atr={atr_v:.6f}"]
+        "rsi": rsi_v,
+        "ema_slope": ema_slope,
+        "atr": atr_v,
+        "notes": [f"ema_slope={ema_slope:.6f}", f"rsi={rsi_v:.2f}", f"atr={atr_v:.6f}"],
     }
     return {"summary": f"{product_id} {timeframe} trend is {label}", "data": payload}
 
@@ -334,19 +415,19 @@ def multi_timeframe_summary(connector: CoinbaseConnector, product_id: str) -> Di
     conflicts = [tf for tf in frames if signals[tf]["trend_label"] != overall]
     return {
         "summary": f"{product_id} MTF signal {overall} ({confidence:.0%} confidence)",
-        "data": {
-            "product_id": product_id,
-            "overall": overall,
-            "confidence": confidence,
-            "conflicts": conflicts,
-            "timeframes": signals,
-        },
+        "data": {"product_id": product_id, "overall": overall, "confidence": confidence, "conflicts": conflicts, "timeframes": signals},
     }
 
 
-def analyze_markets(connector: CoinbaseConnector, quote: str = "USD", window: str = "24h", limit: int = 20) -> Dict[str, Any]:
-    markets = list_markets(connector, quote)["data"]
-    movers = top_movers(connector, window, quote, limit=max(10, limit))["data"]
+def analyze_markets(
+    connector: CoinbaseConnector,
+    quote: str = "USD",
+    window: str = "24h",
+    limit: int = 20,
+    min_volume: float = 0.0,
+) -> Dict[str, Any]:
+    markets = list_markets(connector, quote, limit=250)["data"]
+    movers = top_movers(connector, window, quote, limit=max(10, limit), min_volume=min_volume)["data"]
     vol_rank = volatility_rank(connector, window, quote, limit=max(10, limit))["data"]
     liq = liquidity_snapshot(connector, quote, limit=max(10, limit))["data"]
 
@@ -357,12 +438,13 @@ def analyze_markets(connector: CoinbaseConnector, quote: str = "USD", window: st
             "base": market.get("base"),
             "quote": market.get("quote"),
             "price": None,
-            "change_pct": 0.0,
-            "volume": 0.0,
-            "volatility": 0.0,
+            "change_pct": None,
+            "volume": None,
+            "volatility": None,
             "spread": None,
-            "trend_label": "neutral",
+            "trend_label": None,
             "notes": [],
+            "reasons": [],
             "score": 0.0,
         }
 
@@ -375,6 +457,7 @@ def analyze_markets(connector: CoinbaseConnector, quote: str = "USD", window: st
         item["volume"] = row["volume"]
         item["score"] += abs(row["change_pct"]) * 0.4
         item["notes"].append("strong mover")
+        item["reasons"].append(f"24h change {row['change_pct']:.2f}%")
 
     for rank, row in enumerate(vol_rank, start=1):
         item = by_id.get(row["product_id"])
@@ -383,6 +466,7 @@ def analyze_markets(connector: CoinbaseConnector, quote: str = "USD", window: st
         item["volatility"] = row["volatility"]
         item["score"] += max(0.0, (limit - rank + 1) / limit) * 30
         item["notes"].append("high volatility")
+        item["reasons"].append(f"volatility rank #{rank}")
 
     for row in liq:
         item = by_id.get(row["product_id"])
@@ -392,41 +476,63 @@ def analyze_markets(connector: CoinbaseConnector, quote: str = "USD", window: st
         if row["spread"] <= 1.5:
             item["score"] += 20
             item["notes"].append("sufficient liquidity")
+            item["reasons"].append(f"tight spread {row['spread']:.3f}%")
         else:
             item["notes"].append("wide spread")
 
     ranked = sorted(by_id.values(), key=lambda x: x["score"], reverse=True)
     top = ranked[:limit]
+
+    for item in top[: min(5, len(top))]:
+        try:
+            trend = trend_signal(connector, item["product_id"], timeframe="1h")["data"]
+            item["trend_label"] = trend["trend_label"]
+            item["notes"].append(f"1h trend {trend['trend_label']}")
+        except CoinbaseAPIError:
+            pass
+
     summary = f"Scanned {len(markets)} {quote} markets. Top setup: {top[0]['product_id'] if top else 'n/a'}"
     return {
         "summary": summary,
-        "data": {
-            "quote": quote,
-            "window": window,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "markets": top,
-        },
+        "data": {"quote": quote, "window": window, "generated_at": datetime.now(timezone.utc).isoformat(), "markets": top},
     }
 
 
 def coinbase_doctor(connector: CoinbaseConnector) -> Dict[str, Any]:
     key = os.environ.get("COINBASE_API_KEY")
     secret = os.environ.get("COINBASE_API_SECRET")
-    auth_mode = "api_key" if key and secret else "none"
+    passphrase = os.environ.get("COINBASE_PASSPHRASE")
+
+    auth_mode = "none"
+    if key and secret and passphrase:
+        auth_mode = "exchange_hmac"
+    elif key and secret:
+        auth_mode = "partial_credentials"
+
     checks = []
     try:
         products = connector.list_products()
         checks.append({"name": "public_products", "ok": True, "count": len(products)})
     except CoinbaseAPIError as exc:
         checks.append({"name": "public_products", "ok": False, "error": str(exc)})
-    checks.append({"name": "credentials_present", "ok": bool(key and secret)})
-    checks.append({"name": "permissions", "ok": False, "warning": "Private endpoint permission check unavailable in public-only mode"})
-    ok = all(c.get("ok") for c in checks if c["name"] != "permissions")
+
+    checks.append({"name": "credentials_present", "ok": bool(key and secret), "hint": "COINBASE_API_KEY + COINBASE_API_SECRET"})
+    checks.append({"name": "passphrase_present", "ok": bool(passphrase), "hint": "COINBASE_PASSPHRASE required for Exchange private REST"})
+
+    if auth_mode == "exchange_hmac":
+        try:
+            accounts = connector._get_json("/accounts", authenticated=True)
+            checks.append({"name": "private_accounts", "ok": isinstance(accounts, list), "count": len(accounts) if isinstance(accounts, list) else None})
+        except CoinbaseAPIError as exc:
+            checks.append({"name": "private_accounts", "ok": False, "error": str(exc)})
+    else:
+        checks.append({"name": "private_accounts", "ok": False, "warning": "Skipped: missing exchange passphrase or complete credentials"})
+
+    ok = all(c.get("ok") for c in checks if c["name"] not in {"private_accounts"})
     summary = f"Coinbase doctor {'passed' if ok else 'failed'} (auth mode: {auth_mode})"
-    return {
-        "summary": summary,
-        "data": {
-            "auth_mode": auth_mode,
-            "checks": checks,
-        },
-    }
+    next_steps = []
+    if not passphrase:
+        next_steps.append("Set skills.entries.coinbase-market-analyzer.env.COINBASE_PASSPHRASE for Exchange private endpoint checks.")
+    if not (key and secret):
+        next_steps.append("Set COINBASE_API_KEY and COINBASE_API_SECRET through OpenClaw skills env injection.")
+    return {"summary": summary, "data": {"auth_mode": auth_mode, "checks": checks, "next_steps": next_steps}}
