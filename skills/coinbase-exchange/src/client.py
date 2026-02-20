@@ -22,7 +22,6 @@ class CoinbaseExchangeClient:
         self.max_retries = max_retries
         self.api_key = os.getenv("COINBASE_API_KEY", "")
         self.api_secret = os.getenv("COINBASE_API_SECRET", "")
-        self.passphrase = os.getenv("COINBASE_PASSPHRASE", "")
 
     def _auth_headers(self, method: str, path: str, body: str) -> Dict[str, str]:
         timestamp = str(time.time())
@@ -37,7 +36,6 @@ class CoinbaseExchangeClient:
             "CB-ACCESS-KEY": self.api_key,
             "CB-ACCESS-SIGN": signature,
             "CB-ACCESS-TIMESTAMP": timestamp,
-            "CB-ACCESS-PASSPHRASE": self.passphrase,
         }
 
     def request(

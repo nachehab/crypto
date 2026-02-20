@@ -1,7 +1,7 @@
 ---
 name: coinbase-exchange
 description: Coinbase Exchange market tools (markets, movers, volatility, liquidity, signals)
-metadata: {"openclaw":{"requires":{"env":["COINBASE_API_KEY","COINBASE_API_SECRET","COINBASE_PASSPHRASE"],"bins":[],"config":["skills.entries.coinbase-exchange"]}}}
+metadata: {"openclaw":{"requires":{"env":["COINBASE_API_KEY","COINBASE_API_SECRET"],"bins":[],"config":["skills.entries.coinbase-exchange"]}}}
 ---
 
 Use Python modules under `{baseDir}/src`.

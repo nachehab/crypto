@@ -1,4 +1,4 @@
-# Coinbase Exchange API Notes
+# Coinbase Advanced Trade API Notes
 
 ## Base URL
 
@@ -16,12 +16,11 @@
 
 ## Auth
 
-Exchange REST signing headers:
+Advanced Trade mode headers:
 
 - `CB-ACCESS-KEY`
 - `CB-ACCESS-SIGN`
 - `CB-ACCESS-TIMESTAMP`
-- `CB-ACCESS-PASSPHRASE`
 
 Signature format: `base64(hmac_sha256(base64_decode(secret), timestamp + method + path + body))`.
 
