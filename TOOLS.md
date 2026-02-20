@@ -20,3 +20,8 @@
 ## Symbol Handling
 - Accept generic symbols using `SYMBOL-USD` format.
 - Keep backward compatibility with XRP-first account display where configured.
+
+## Coinbase Analysis Commands
+- `agents/main/agent/bin/coinbase_doctor.sh`
+- `agents/main/agent/bin/coinbase_analyze_markets.sh --quote USD --window 24h --limit 20`
+- `agents/main/agent/bin/coinbase_analyze_markets_fn.sh '{"quote":"USD","window":"24h","limit":20}'`
