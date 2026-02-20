@@ -1,8 +1,25 @@
+import json
 import os
+import threading
+import sys
+from pathlib import Path
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 os.environ["COINBASE_MARKETS_CACHE"] = "/tmp/coinbase_markets_cache_test.json"
 
-from scripts.coinbase_analysis import analyze_markets, realized_volatility, top_movers
+from scripts.coinbase_analysis import (
+    CoinbaseConnector,
+    analyze_markets,
+    atr,
+    ema,
+    realized_volatility,
+    rsi,
+    top_movers,
+)
 
 
 class MockConnector:
@@ -56,10 +73,32 @@ def test_realized_volatility_synthetic():
     assert vol > 0
 
 
+def test_trend_metrics_computation():
+    closes = [100 + i for i in range(60)]
+    ema_vals = ema(closes, 20)
+    assert len(ema_vals) == len(closes)
+    assert rsi(closes) > 50
+
+    candles = [[i, 99 + i, 101 + i, 100 + i, 100 + i, 1] for i in range(30)]
+    assert atr(candles) > 0
+
+
 def test_analyze_markets_schema():
     result = analyze_markets(MockConnector(), quote="USD", window="24h", limit=3)
     market = result["data"]["markets"][0]
-    expected = {"product_id", "base", "quote", "price", "change_pct", "volume", "volatility", "spread", "trend_label", "notes"}
+    expected = {
+        "product_id",
+        "base",
+        "quote",
+        "price",
+        "change_pct",
+        "volume",
+        "volatility",
+        "spread",
+        "trend_label",
+        "notes",
+        "reasons",
+    }
     assert expected.issubset(set(market.keys()))
 
 
@@ -67,3 +106,44 @@ def test_analyze_markets_integration_order():
     result = analyze_markets(MockConnector(), quote="USD", window="24h", limit=2)
     assert len(result["data"]["markets"]) == 2
     assert result["summary"].startswith("Scanned")
+
+
+def test_http_integration_with_mock_server(monkeypatch):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/products":
+                payload = [{"id": "AAA-USD", "base_currency": "AAA", "quote_currency": "USD", "status": "online"}]
+            elif self.path == "/orders":
+                payload = [{"id": "1"}]
+                self.send_response(200)
+                self.send_header("cb-after", "cursor-1")
+                self.end_headers()
+                self.wfile.write(json.dumps(payload).encode())
+                return
+            elif self.path == "/orders?after=cursor-1":
+                payload = [{"id": "2"}]
+            else:
+                payload = {"ok": True}
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps(payload).encode())
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    from scripts import coinbase_analysis
+
+    monkeypatch.setattr(coinbase_analysis, "EXCHANGE_API", f"http://127.0.0.1:{server.server_port}")
+
+    conn = CoinbaseConnector(timeout=2)
+    products = conn.list_products()
+    pages = conn.get_paginated("/orders")
+
+    server.shutdown()
+
+    assert products[0]["id"] == "AAA-USD"
+    assert [row["id"] for row in pages] == ["1", "2"]
