@@ -1,0 +1,32 @@
+{
+  "name": "coinbase-market-analyzer",
+  "version": "1.0.0",
+  "description": "Coinbase Exchange market analysis skill for OpenClaw",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "smoke": "node dist/smoke-test.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["openclaw", "coinbase", "trading", "market-analysis"],
+  "author": "OpenClaw Codex",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
