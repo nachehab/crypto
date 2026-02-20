@@ -1,141 +1,16 @@
 {
-  "meta": {
-    "lastTouchedVersion": "2026.2.19-2",
-    "lastTouchedAt": "2026-02-19T19:44:55.564Z"
-  },
-  "env": {
-    "shellEnv": {
-      "enabled": true
-    },
-    "vars": {
-      "COINBASE_API_SECRET": "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIJANcQH7cTR6BOO186L9uA876boPVjE3Q0RS1rjDRID3oAoGCCqGSM49\\nAwEHoUQDQgAE8s2t7Zd4epwUm59+NIsPrNss/AuofnL8uzy5eJlG6JXThCZTIlDY\\ngDaYpUtbwCT0LfA9W3/K/f7X1WcB4gTqZQ==\\n-----END EC PRIVATE KEY-----\\n",
-      "COINBASE_API_KEY": "organizations/4456adcb-0fc5-4f8e-81ea-314032fe55ed/apiKeys/fd487e30-9667-40d4-8236-461751dac9a2"
-    }
-  },
-  "wizard": {
-    "lastRunAt": "2026-02-19T19:44:55.496Z",
-    "lastRunVersion": "2026.2.19-2",
-    "lastRunCommand": "configure",
-    "lastRunMode": "local"
-  },
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "custom-192-168-86-128-11434": {
-        "baseUrl": "http://192.168.86.128:11434/v1",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "qwen2.5:7b-instruct",
-            "name": "qwen2.5:7b-instruct",
-            "reasoning": false,
-            "input": [
-              "text"
-            ],
-            "cost": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0
-            },
-            "contextWindow": 16000,
-            "maxTokens": 512
-          }
-        ]
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "custom-192-168-86-128-11434/qwen2.5:7b-instruct"
-      },
-      "models": {
-        "custom-192-168-86-128-11434/qwen2.5:7b-instruct": {
-          "alias": "ollama"
-        }
-      },
-      "workspace": "/home/nader/.openclaw/workspace",
-      "compaction": {
-        "mode": "safeguard"
-      },
-      "maxConcurrent": 2,
-      "subagents": {
-        "maxConcurrent": 2
-      }
-    }
-  },
-  "tools": {
-    "web": {
-      "search": {
-        "enabled": true
-      },
-      "fetch": {
-        "enabled": true
-      }
-    }
-  },
-  "messages": {
-    "ackReactionScope": "group-mentions"
-  },
-  "commands": {
-    "native": "auto",
-    "nativeSkills": "auto",
-    "restart": true
-  },
-  "hooks": {
-    "internal": {
-      "enabled": true,
-      "entries": {
-        "session-memory": {
-          "enabled": true
-        },
-        "bootstrap-extra-files": {
-          "enabled": true
-        }
-      }
-    }
-  },
-  "gateway": {
-    "port": 18789,
-    "mode": "local",
-    "bind": "loopback",
-    "controlUi": {
-      "allowInsecureAuth": false
-    },
-    "auth": {
-      "mode": "token",
-      "token": "6b7e1a27caa58c23af84bdfcf1b16f0e2a358f9c538a47a6"
-    },
-    "tailscale": {
-      "mode": "serve",
-      "resetOnExit": false
-    },
-    "nodes": {
-      "denyCommands": [
-        "camera.snap",
-        "camera.clip",
-        "screen.record",
-        "calendar.add",
-        "contacts.add",
-        "reminders.add"
-      ]
-    }
-  },
   "skills": {
-    "install": {
-      "nodeManager": "pnpm"
+    "load": {
+      "workspace": true
     },
     "entries": {
-      "base-trader": {
-        "enabled": false
-      },
-      "coinbase-market-analyzer": {
+      "coinbase-exchange": {
         "enabled": true,
         "env": {
           "COINBASE_API_KEY": "${COINBASE_API_KEY}",
           "COINBASE_API_SECRET": "${COINBASE_API_SECRET}",
-          "COINBASE_PASSPHRASE": "${COINBASE_PASSPHRASE}"
+          "COINBASE_PASSPHRASE": "${COINBASE_PASSPHRASE}",
+          "COINBASE_API_URL": "${COINBASE_API_URL}"
         },
         "apiKey": "${COINBASE_API_KEY}"
       }
